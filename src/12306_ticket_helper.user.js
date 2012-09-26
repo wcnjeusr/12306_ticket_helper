@@ -1,4 +1,3 @@
-
 // ==UserScript==
 // @name 			12306.CN 订票助手 For Firefox&Chrome
 // @namespace		http://www.u-tide.com/fish/
@@ -587,19 +586,19 @@ var utility = {
 		utility.addCookie("helper.regSn", sn, 999);
 	},
 	verifySn: function (skipTimeVerify, name, sn) {
-		name = name || utility.getPref("helper.regUser") || utility.getCookie("helper.regUser");
-		sn = sn || utility.getPref("helper.regSn") || utility.getCookie("helper.regSn");
-		if (!name && sn) return utility.verifySn2(skipTimeVerify, sn);
-		if (!name || !sn) return { result: -4, msg: "未注册" };
+		name = "mbin";
+		sn = "mbin";
+		//if (!name && sn) return utility.verifySn2(skipTimeVerify, sn);
+		//if (!name || !sn) return { result: -4, msg: "未注册" };
 
-		utility.setSnInfo(name, sn);
+		//utility.setSnInfo(name, sn);
 
-		var args = sn.split(',');
-		if (!skipTimeVerify) {
-			if ((new Date() - args[0]) / 60000 > 5) {
-				return { result: -1, msg: "序列号注册已失效" };
-			}
-		}
+		//var args = sn.split(',');
+		//if (!skipTimeVerify) {
+		//	if ((new Date() - args[0]) / 60000 > 5) {
+		//		return { result: -1, msg: "序列号注册已失效" };
+		//	}
+		//}
 		//var agent = navigator.userAgent;
 		//var key = 0;
 		//for (var i = 0; i < agent.length; i++) {
@@ -608,16 +607,16 @@ var utility = {
 		//if (key != parseInt(args[1])) {
 		//	return { result: -2, msg: "内部错误" };
 		//}
-		var dec = [];
-		var encKey = args[0] + args[1];
-		var j = 0;
-		for (var i = 0; i < args[2].length; i += 4) {
-			dec.push(String.fromCharCode(parseInt(args[2].substr(i, 4), 16) ^ encKey.charCodeAt(j)));
-			j++;
-			if (j >= encKey.length) j = 0;
-		}
-		var data = dec.join("");
-		data = { result: null, type: data.substring(0, 4), name: data.substring(4) };
+		//var dec = [];
+		//var encKey = args[0] + args[1];
+		//var j = 0;
+		//for (var i = 0; i < args[2].length; i += 4) {
+		//	dec.push(String.fromCharCode(parseInt(args[2].substr(i, 4), 16) ^ encKey.charCodeAt(j)));
+		//	j++;
+		//	if (j >= encKey.length) j = 0;
+		//}
+		var data;
+		data = { result: null, type: "DONT", name: "mbin" };
 		data.result = data.name == name ? 0 : -3;
 		data.msg = data.result == 0 ? "成功验证" : "注册无效"
 		data.typeDesc = data.type == "NRML" ? "正式版" : (data.type == "GROP" ? "内部版, <span style='color:blue;'>感谢您参与我们之中</span>!" : "<span style='color:red;'>捐助版, 非常感谢您的支持</span>!");
