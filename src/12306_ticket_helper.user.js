@@ -616,7 +616,7 @@ var utility = {
 		//	if (j >= encKey.length) j = 0;
 		//}
 		var data;
-		data = { result: null, type: "DONT", name: "mbin" };
+		data = { result: null, type: "NRML", name: "mbin" };
 		data.result = data.name == name ? 0 : -3;
 		data.msg = data.result == 0 ? "成功验证" : "注册无效"
 		data.typeDesc = data.type == "NRML" ? "正式版" : (data.type == "GROP" ? "内部版, <span style='color:blue;'>感谢您参与我们之中</span>!" : "<span style='color:red;'>捐助版, 非常感谢您的支持</span>!");
