@@ -9,10 +9,10 @@
 // @match			http://dynamic.12306.cn/otsweb/*
 // @match			https://dynamic.12306.cn/otsweb/*
 // @match			https://www.12306.cn/otsweb/*
-// @require			https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
+// @require			http://lib.sinaapp.com/js/jquery/1.8.3/jquery.min.js
 // @icon			http://www.12306.cn/mormhweb/images/favicon.ico
 // @run-at			document-idle
-// @version 		3.5.6
+// @version 		3.6.1
 // @updateURL		http://www.fishlee.net/Service/Download.ashx/44/47/12306_ticket_helper.user.js
 // @supportURL		http://www.fishlee.net/soft/44/
 // @homepage		http://www.fishlee.net/soft/44/
@@ -24,15 +24,11 @@
 // @id				12306_ticket_helper_by_ifish@fishlee.net
 // @namespace		ifish@fishlee.net
 
-var version = "3.5.6";
+var version = "3.6.1";
 var updates = [
-	"修复自动预定中不能使用正则表达式的BUG",
-	"- 取消订票时间手动修改功能(喔……被铁道部枪毙了 ╮(╯▽╰)╭)",
-	"增加订票最小张数限制",
-	"修改刷新余票为即时刷新 (感谢 cutefelix 的提交)",
-	"自动选择人员增加对护照等其它类型证件的支持",
-	"增加请求日志功能（左上角显示日志按钮，出现异常的操作时请点击此按钮并复制日志）",
-	"(其它细节更改)",
+	"支持预先选择席别并自动选中",
+	"修正部分情况下可能导致的自动选择乘客失败的问题",
+	"其它细节调整",
 	"<span style='color:red;'>警告！谷歌商店中由 www.6pmhaitao.com 发布的订票助手扩展为盗用本助手并加入恶意脚本后打包的，请大家不要安装！</span>"
 ];
 
@@ -747,13 +743,15 @@ var utility = {
 		return new RegExp("^(" + data.join("|") + ")$", "i");
 	},
 	enableLog: function () {
-		$("body").append('<button style="width:100px;position:fixed;left:0px;top:0px;height:35px;" onclick="utility.showLog();">显示运行日志</button>');
+		$("body").append('<button style="width:100px;position:fixed;right:0px;top:0px;height:35px;" onclick="utility.showLog();">显示运行日志</button>');
 		$(document).ajaxSuccess(function (a, b, c) {
+			if (!c.log) return;
 			c.log.response = b.responseText;
 			c.log.success = true;
 		}).ajaxSend(function (a, b, c) {
 			utility.appendLog(c);
 		}).ajaxError(function (a, b, c) {
+			if (!c.log) return;
 			c.log.response = b.responseText;
 		});
 	}
@@ -1295,11 +1293,11 @@ function initAutoCommitOrder() {
 	$("#showHelp").change(function () {
 		if (this.checked) {
 			window.localStorage.setItem("showHelp", "1");
-			$("table.table_qr tr:eq(11)").show();
+			$("table.table_qr tr:last").show();
 		}
 		else {
 			window.localStorage.removeItem("showHelp");
-			$("table.table_qr tr:eq(11)").hide();
+			$("table.table_qr tr:last").hide();
 		}
 	}).change();
 
@@ -1394,44 +1392,36 @@ function initAutoCommitOrder() {
 
 
 	//#region 自动选择联系人、自动选择上次选择的人
-
-	(function () {
+	function autoSelectPassenger() {
 		var pp = localStorage.getItem("preSelectPassenger") || "";
+		var pseat = localStorage.getItem("autoSelect_preSelectSeatType") || "";
 		if (pp) {
 			pp = pp.split("|");
 
 			$.each(pp, function () {
-				if (!pp) return true;
-				$("#" + this + " input").attr("checked", true).click();
+				if (!this) return true;
+				console.log("[INFO][自动选择乘客] 自动选定-" + this);
+				console.log($("#" + this + "._checkbox_class"))
+				$("#" + this + "._checkbox_class").attr("checked", true).click().attr("checked", true);	//为啥设置两次？我也不知道，反正一次不对。
+				return true;
 			});
-		} else {
-			//#region  记住上次选择的人 by yangg
-			var filterPanel = $('#showPassengerFilter');
-			var input = $('<br/><label><input id="checkboxauto" type="checkbox"/>记住我选择的联系人，下次自动选中</label>').appendTo(filterPanel);
-			filterPanel.find(':checkbox').change(function () {
-				localStorage.autocheckids = filterPanel.find(':checked').map(function () {
-					return this.id;
-				}).get().join('|');
-			});
-			var ids = (localStorage.autocheckids || '').split('|');
-			// checkboxauto is checked
-			if (ids.length && ids[ids.length - 1] == 'checkboxauto') {
-				ids.forEach(function (id) {
-					filterPanel.find('#' + id).attr('checked', true).click().attr('checked', true);
-				});
+			if (pseat) {
+				$(".passenger_class").each(function () { $(this).find("select:eq(0)").val(pseat); });
 			}
-			//#endregion
 		}
-	})();
+	};
 
-	//#endregion
-
-	//#region 为每个联系人都加上label，以便于选择
-
-	(function () {
-		$("#showPassengerFilter>div>span").wrap("<label></label");
-	})();
-
+	$(window).ajaxComplete(function (e, xhr, s) {
+		if (s.url.indexOf("getpassengerJson") != -1) {
+			console.log("[INFO][自动选择乘客] 系统联系人加载完成，正在检测预先选定");
+			autoSelectPassenger();
+		}
+	});
+	//如果已经加载完成，那么直接选定
+	if ($("#showPassengerFilter div").length) {
+		console.log("[INFO][自动选择乘客] OOPS，居然加载完成了？直接选定联系人");
+		autoSelectPassenger();
+	}
 	//#endregion
 
 	//#region 自动定位到随机码中
@@ -1833,7 +1823,7 @@ function initTicketQuery() {
 
 
 		var hasTicket = 1;
-		if ($("input.yuding_x", this).length > 0) return 0;
+		if ($("a.btn130", this).length > 0) return 0;
 
 		$("td", this).each(function (i, e) {
 			var cellResult = 0;
@@ -1852,8 +1842,9 @@ function initTicketQuery() {
 	});
 
 	//检测是否有余票的函数
-	var checkTickets = function (row) {
+	var checkTickets = function () {
 		var result = 0;
+		var row = this;
 		$.each(checkTicketsQueue, function () {
 			result = this.call(row, result) || result;
 
@@ -1873,10 +1864,12 @@ function initTicketQuery() {
 		var validRows = {};
 		rows.each(function () {
 			var row = $(this);
-			var valid = checkTickets(row);
+			var valid = checkTickets.call(row);
+			var code = getTrainNo(row);
+
+			console.log("[INFO][车票可用性校验] " + code + " 校验结果=" + valid);
 
 			if (valid == 2) {
-				var code = getTrainNo(row);
 				row.css("background-color", "#FD855C");
 				validRows[code] = row;
 			}
@@ -1896,7 +1889,7 @@ function initTicketQuery() {
 				if (document.getElementById("autoBookTip").checked) {
 					window.localStorage["bookTip"] = 1;
 				}
-				validRows[i].find(".yuding_u, .yuding_u_over").click();
+				validRows[i].find("a[name=btn130_2]").click();
 
 				break;
 			}
@@ -1929,6 +1922,7 @@ function initTicketQuery() {
 		}
 	});
 	$("body").ajaxError(function (e, r, s) {
+		if (s.url.indexOf("queryLeftTicket") == -1) return;
 		if (!$("#chkAutoRequery")[0].checked) return;
 		if (s.url.indexOf("/otsweb/order/querySingleAction.do") != -1) {
 			delayButton();
@@ -2106,8 +2100,27 @@ function initTicketQuery() {
 		var html = [];
 		html.push("<tr class='caption'><td colspan='4'>自动添加乘客 （加入此列表的乘客将会自动在提交订单的页面中添加上，<strong>最多选五位</strong>）</td></tr>");
 		html.push("<tr class='fish_sep'><td id='passengerList' colspan='4'><span style='color:gray; font-style:italic;'>联系人列表正在加载中，请稍等...</span></td></tr>");
+		html.push("<tr class='fish_sep'><td class='name'>自动选定席别</td><td><select id='preSelectSeat'></select></td><td></td><td></td></tr>");
 
 		$("#helpertooltable tr:first").addClass("fish_sep").before(html.join(""));
+
+		var seatlist = [
+			["", "<无设置>"],
+			["9", "商务座"],
+			["4", "软卧"],
+			["3", "硬卧"],
+			["2", "软座"],
+			["1", "硬座"],
+			["M", "一等座"],
+			["O", "二等座"]
+		];
+		var seatDom = document.getElementById("preSelectSeat");
+		$.each(seatlist, function () {
+			seatDom.options[seatDom.options.length] = new Option(this[1], this[0]);
+		});
+		$(seatDom).val(window.localStorage.getItem("autoSelect_preSelectSeatType") || "").change(function () {
+			window.localStorage.setItem("autoSelect_preSelectSeatType", $(this).val());
+		});
 
 		//加载乘客
 		utility.getAllPassengers(function (list) {
@@ -2373,7 +2386,7 @@ function initLogin() {
 					setTipMessage(msg);
 					setCurOperationInfo(false, "请重新输入。");
 					stopLogin();
-				} else if (html.indexOf("欢迎您！") != -1) {
+				} else if (html.indexOf("欢迎您登录") != -1) {
 					utility.notifyOnTop('登录成功，开始查询车票吧！');
 					window.location.href = "https://dynamic.12306.cn/otsweb/order/querySingleAction.do?method=init";
 				} else {
