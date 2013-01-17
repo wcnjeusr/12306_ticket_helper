@@ -12,7 +12,7 @@
 // @require			http://lib.sinaapp.com/js/jquery/1.8.3/jquery.min.js
 // @icon			http://www.12306.cn/mormhweb/images/favicon.ico
 // @run-at			document-idle
-// @version 		4.2.1
+// @version 		4.2.2
 // @updateURL		http://www.fishlee.net/Service/Download.ashx/44/47/12306_ticket_helper.user.js
 // @supportURL		http://www.fishlee.net/soft/44/
 // @homepage		http://www.fishlee.net/soft/44/
@@ -22,11 +22,10 @@
 
 //=======START=======
 
-var version = "4.2.1";
+var version = "4.2.2";
 var updates = [
-	"修正硬座票没有时自动提交失效的问题",
-	"自动提交和自动预定逻辑和提示优化",
-	"移除GitHub上所有的资源引用"
+	"修改联系人加载方式（TDB的这次修改我无力吐槽了……为了改而改……）",
+	"默认清空音乐设置（Firefox下暂时没有声音，请务必注意）"
 ];
 
 var faqUrl = "http://www.fishlee.net/soft/44/faq.html";
@@ -801,7 +800,7 @@ var utility = {
 		var pageIndex = 0;
 
 		function loadPage() {
-			utility.post("/otsweb/passengerAction.do?method=queryPagePassenger", { pageSize: 10, pageIndex: pageIndex }, "json", function (json) {
+			utility.post("/otsweb/passengerAction.do?method=getPagePassenger", { pageSize: 10, pageIndex: pageIndex }, "json", function (json) {
 				$.each(json.rows, function () { utility.allPassengers.push(this); });
 
 				if (utility.allPassengers.length >= json.recordCount) {
