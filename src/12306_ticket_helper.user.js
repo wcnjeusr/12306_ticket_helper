@@ -12,7 +12,7 @@
 // @require			http://lib.sinaapp.com/js/jquery/1.8.3/jquery.min.js
 // @icon			http://www.12306.cn/mormhweb/images/favicon.ico
 // @run-at			document-idle
-// @version 		4.2.2
+// @version 		4.2.4
 // @updateURL		http://www.fishlee.net/Service/Download.ashx/44/47/12306_ticket_helper.user.js
 // @supportURL		http://www.fishlee.net/soft/44/
 // @homepage		http://www.fishlee.net/soft/44/
@@ -22,10 +22,12 @@
 
 //=======START=======
 
-var version = "4.2.2";
+var version = "4.2.4";
 var updates = [
-	"修改联系人加载方式（TDB的这次修改我无力吐槽了……为了改而改……）",
-	"默认清空音乐设置（Firefox下暂时没有声音，请务必注意）"
+	"修改自动预定和自动提交逻辑，提示排队人数过多时自动重试 (不过此类情况成功率不高，建议多做打算)",
+	"修改自动提交的重试过程可以通过取消勾选『自动提交』来取消",
+	"修正改签的自动提交会生成一个新的订单",
+	"修正自动提交在出现网络错误时，可能会卡住的BUG"
 ];
 
 var faqUrl = "http://www.fishlee.net/soft/44/faq.html";
@@ -236,7 +238,6 @@ function injectDom() {
 	//新版本更新显示提示
 	if (utility.getPref("helperVersion") != window.helperVersion) {
 		utility.setPref("helperVersion", window.helperVersion);
-
 		//仅顶层页面显示
 		try {
 			if (parent == self)
@@ -1352,7 +1353,7 @@ function initAutoCommitOrder() {
 			},
 			error: function (msg) {
 				setCurOperationInfo(false, "当前请求发生错误");
-				utility.delayInvoke(null, submitForm, 3000);
+				utility.delayInvoke(null, submitForm, 1000);
 			}
 		});
 	}
@@ -1370,10 +1371,12 @@ function initAutoCommitOrder() {
 		utility.get("/otsweb/order/confirmPassengerAction.do?method=getQueueCount", queryLeftData, "json", function (data) {
 			console.log(data);
 			if (data.op_2) {
-				var errmsg = "排队人数过多，系统禁止排队，可以输入验证码重试 (排队人数=" + data.count + ")";
-				setCurOperationInfo(false, errmsg);
+				var errmsg = "排队人数过多，系统禁止排队，稍等自动重试 (排队人数=" + data.count + ")";
+				setCurOperationInfo(true, errmsg);
 				stop(errmsg);
-				reloadCode();
+
+				utility.delayInvoke(null, queryQueueCount, 1000);
+
 
 				return;
 			}
@@ -1476,6 +1479,7 @@ function initAutoCommitOrder() {
 					reloadCode();
 				} else if (json.waitTime == -2) {
 					var msg = "很抱歉, 铁道部说您占座失败 : " + json.msg + ', 赶紧重新来过!';
+					reloadToken();
 					utility.notify(msg);
 					setCurOperationInfo(false, msg);
 					stop(msg);
@@ -3215,6 +3219,7 @@ function initDirectSubmitOrder() {
 	function checkOrderInfo() {
 		setCurOperationInfo(true, "正在检测订单状态....");
 		utility.notifyOnTop("开始自动提交订单！");
+		console.log(data);
 
 		utility.post("confirmPassengerAction.do?method=checkOrderInfo&rand=" + getVcCode(), formData.join("&") + "&randCode=" + getVcCode(), "json", function (data) {
 			console.log(data);
@@ -3234,11 +3239,15 @@ function initDirectSubmitOrder() {
 			queryQueueInfo();
 		}, function () {
 			setCurOperationInfo(false, "网络出现错误，稍等重试");
-			utility.delayInvoke(counter, checkOrderInfo, 2000);
+			utility.delayInvoke(counter, checkOrderInfo, 500);
 		});
 	}
 
 	function queryQueueInfo() {
+		if (!document.getElementById("autoorder").checked) {
+			hideStatus();
+			return;
+		}
 		setCurOperationInfo(true, "正在提交订单");
 		setTipMessage("正在检查队列。");
 
@@ -3253,22 +3262,38 @@ function initDirectSubmitOrder() {
 		};
 		utility.get("/otsweb/order/confirmPassengerAction.do?method=getQueueCount", queryLeftData, "json", function (data) {
 			if (data.op_2) {
-				utility.notifyOnTop("排队人数过多，系统禁止排队，可以输入验证码重试！");
+				//utility.notifyOnTop("排队人数过多，系统禁止排队，稍等重试。要重新查询，请刷新页面！");
 				setTipMessage("排队人数过多 (人数=" + data.count + ")");
-				setCurOperationInfo(false, "排队人数过多");
-				reloadCode();
+				setCurOperationInfo(true, "排队人数过多");
+				utility.delayInvoke(counter, queryQueueInfo, 500);
 			} else {
 				submitOrder();
 			}
-		}, function () { utility.delayInvoke(null, queryLeftTickets, 2000); });
+		}, function () { utility.delayInvoke(counter, queryQueueInfo, 500); });
 
 	}
 
 	function submitOrder() {
+		if (!document.getElementById("autoorder").checked) {
+			hideStatus();
+			return;
+		}
 		setCurOperationInfo(true, "正在提交订单");
 		setTipMessage("已检测状态。");
 
-		utility.post("/otsweb/order/confirmPassengerAction.do?method=confirmSingleForQueueOrder",
+		var order_type = 'confirmSingleForQueueOrder'; //'dc' 单程
+		if (tourFlag == 'wc') {
+			// 异步下单-往程
+			order_type = 'confirmPassengerInfoGoForQueue';
+		} else if (tourFlag == 'fc') {
+			// 异步下单-返程
+			order_type = 'confirmPassengerInfoBackForQueue';
+		} else if (tourFlag == 'gc') {
+			// 异步下单-改签
+			order_type = 'confirmPassengerInfoResignForQueue';
+		}
+
+		utility.post('/otsweb/order/confirmPassengerAction.do?method=' + order_type,
 			formData.join("&") + "&randCode=" + getVcCode(), "json", function (data) {
 				var msg = data.errMsg;
 
