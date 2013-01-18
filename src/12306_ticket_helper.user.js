@@ -1158,6 +1158,7 @@ function entryPoint() {
 
 function storePasToLocal() {
 	var isNew = !window.localStorage["pas"];
+	window.localStorage.removeItem("pas");
 
 	utility.getAllPassengers(function (list) {
 		window.localStorage.setItem("pas", $.toJSON(list));
@@ -1165,6 +1166,8 @@ function storePasToLocal() {
 		if (isNew) {
 			alert("恭喜，联系人已经缓存到本地，现在可以去查票咯！");
 			self.location = "/otsweb/order/querySingleAction.do?method=init";
+		} else {
+			utility.notifyOnTop("恭喜，本地联系人缓存已经更新，现在可以去查票咯！");
 		}
 	});
 }
